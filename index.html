@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>X Archive share</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<meta name="theme-color" content="#8a3b12">
+<style>
+  :root { --paper:#f6f1e8; --card:#fffdf8; --ink:#2a241d; --muted:#7b6f5f; --line:#e2d8c7; --accent:#8a3b12; --ok:#2f6b2f; --bad:#a12b14; --warn:#9a6a00; }
+  @media (prefers-color-scheme: dark) { :root { --paper:#1b1814; --card:#24201b; --ink:#ece4d6; --muted:#a69a88; --line:#3b342b; --accent:#e0814d; --ok:#7cc47c; --bad:#ff8a6a; --warn:#e3a93c; } }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 560px; margin: 0 auto; padding: 16px 16px 40px; }
+  h1 { font: 600 22px "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif; margin: 4px 0 12px; }
+  h2 { font-size: 16px; margin: 22px 0 8px; }
+  .muted { color: var(--muted); } .small { font-size: 14px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin: 10px 0; overflow-wrap: anywhere; }
+  .big { font-size: 20px; font-weight: 600; }
+  .ok { color: var(--ok); } .bad { color: var(--bad); } .warn { color: var(--warn); }
+  button { font: inherit; cursor: pointer; border: 1px solid var(--accent); background: var(--accent); color: #fff; border-radius: 10px; padding: 10px 16px; min-height: 44px; }
+  button.ghost { background: transparent; color: var(--ink); border-color: var(--line); }
+  .btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  label { display: block; margin: 10px 0 4px; font-size: 14px; color: var(--muted); }
+  input { width: 100%; font: inherit; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--ink); }
+  .row { border-bottom: 1px solid var(--line); padding: 8px 0; }
+  .row:last-child { border-bottom: none; }
+  .row .what { font-size: 15px; }
+  .row .state { font-size: 13px; }
+  details summary { cursor: pointer; padding: 6px 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>X Archive share</h1>
+
+  <div id="shareBox" class="card" hidden>
+    <div id="shareState" class="big">Sending…</div>
+    <div id="shareWhat" class="small muted"></div>
+    <div id="shareNote" class="small"></div>
+    <div class="btns"><button id="doneBtn">Done</button><button id="retryBtn" class="ghost" hidden>Try again</button></div>
+  </div>
+
+  <div id="intro" class="card small">
+    To save a post or a page: in X, Chrome, Discover or any app, tap <b>Share</b>, then <b>X Archive</b>. It goes to your archive's inbox on GitHub; your computer saves it in its next run. Shares wait safely on this phone when there is no internet.
+  </div>
+
+  <h2>Sent and waiting</h2>
+  <div id="list" class="card"><span class="muted small">Nothing shared yet.</span></div>
+  <div class="btns"><button id="sendAll" class="ghost">Send the waiting ones now</button></div>
+
+  <h2>Settings</h2>
+  <details id="setBox" class="card">
+    <summary>GitHub repository and key</summary>
+    <label for="owner">GitHub user</label><input id="owner" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <label for="repo">Repository</label><input id="repo" autocomplete="off" autocapitalize="off" spellcheck="false">
+    <label for="token">Key (a fine-grained personal access token for that repository only, with "Contents: Read and write")</label><input id="token" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="github_pat_…">
+    <div class="btns"><button id="saveSet">Save and test</button></div>
+    <p id="setNote" class="small"></p>
+    <p class="small muted">The key is kept only on this phone. It can write to that one repository and nothing else. If the phone is lost, delete the key on github.com (Settings, Developer settings, Personal access tokens).</p>
+  </details>
+</main>
+<script src="send.js"></script>
+<script>
+(async () => {
+  const $ = (s) => document.querySelector(s);
+  const esc = (s) => String(s || '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  async function askSync() { try { const reg = await navigator.serviceWorker.ready; if (reg.sync) await reg.sync.register('xa-send'); } catch { /* not offered */ } }
+
+  async function renderList() {
+    const all = await XA.allShares();
+    $('#list').innerHTML = all.length ? all.slice(0, 40).map((s) => `<div class="row"><div class="what">${esc(s.title || s.url || s.text.slice(0, 80) || '(empty)')}</div>
+      <div class="state ${s.state === 'sent' ? 'ok' : 'warn'}">${s.state === 'sent' ? `Sent ${new Date(s.sentAt || s.sharedAt).toLocaleString()}` : `Waiting: ${esc(s.note || 'not sent yet')}`}</div></div>`).join('')
+      : '<span class="muted small">Nothing shared yet.</span>';
+  }
+  async function renderSettings() {
+    const s = await XA.getSettings();
+    $('#owner').value = s.owner; $('#repo').value = s.repo; $('#token').value = s.token ? '••••••••' : '';
+    if (!s.token) { $('#setBox').open = true; $('#setNote').innerHTML = '<span class="warn">No key yet: shares are kept on this phone until you add one.</span>'; }
+  }
+
+  // A share arriving from another app: the address carries it (?title=…&text=…&url=…).
+  const p = new URLSearchParams(location.search);
+  if (p.has('url') || p.has('text') || p.has('title')) {
+    const share = XA.newShare({ url: p.get('url'), title: p.get('title'), text: p.get('text') });
+    history.replaceState(null, '', location.pathname);        // a reload does not send it twice
+    await XA.putShare(share);
+    $('#shareBox').hidden = false; $('#intro').hidden = true;
+    $('#shareWhat').textContent = share.title || share.url || share.text.slice(0, 120);
+    const show = async () => {
+      const r = await XA.sendWaiting();
+      const mine = (await XA.allShares()).find((x) => x.id === share.id);
+      if (mine && mine.state === 'sent') { $('#shareState').textContent = 'Sent ✓'; $('#shareState').className = 'big ok'; $('#shareNote').textContent = 'It is in your archive\'s inbox on GitHub. Your computer saves it in its next run.'; $('#retryBtn').hidden = true; }
+      else { $('#shareState').textContent = 'Kept on this phone'; $('#shareState').className = 'big warn'; $('#shareNote').textContent = (mine && mine.note) || 'not sent yet'; $('#retryBtn').hidden = false; if (r.retry) askSync(); }
+      renderList();
+    };
+    await show();
+    $('#retryBtn').onclick = show;
+  }
+  $('#doneBtn').onclick = () => { window.close(); setTimeout(() => { $('#shareBox').hidden = true; $('#intro').hidden = false; }, 300); };
+  $('#sendAll').onclick = async () => { const r = await XA.sendWaiting(); if (r.retry) askSync(); renderList(); };
+  $('#saveSet').onclick = async () => {
+    await XA.setSetting('owner', $('#owner').value.trim() || 'sheikhpervezhameed-wq');
+    await XA.setSetting('repo', $('#repo').value.trim() || 'bookmark-archive');
+    const t = $('#token').value.trim();
+    if (t && !/^•+$/.test(t)) await XA.setSetting('token', t);
+    const note = await XA.testKey(await XA.getSettings());
+    $('#setNote').innerHTML = `<span class="${/^OK/.test(note) ? 'ok' : 'bad'}">${esc(note)}</span>`;
+    if (/^OK/.test(note)) { await XA.sendWaiting(); renderList(); }
+    renderSettings();
+  };
+  window.addEventListener('online', async () => { await XA.sendWaiting(); renderList(); });
+  await renderSettings();
+  await renderList();
+})();
+</script>
+</body>
+</html>
