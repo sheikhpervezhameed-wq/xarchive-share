@@ -1,8 +1,8 @@
 // X Archive phone app: works offline (the page is kept on the phone), and sends waiting shares by itself
 // when the phone is back online (Background Sync, in Chrome on Android).
 importScripts('send.js');
-const CACHE = 'xa-phone-v1';
-const FILES = ['./', './index.html', './send.js', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
+const CACHE = 'xa-phone-v2';     // 0.9.5: search added
+const FILES = ['./', './index.html', './send.js', './phone-search.js', './phone-embed.js', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', (e) => { e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', (e) => {

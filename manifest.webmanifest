@@ -1,7 +1,7 @@
 {
-  "name": "X Archive share",
+  "name": "X Archive",
   "short_name": "X Archive",
-  "description": "Sends a post or a page from your phone to your X Archive.",
+  "description": "Sends a post or a page from your phone to your X Archive, and searches the archive.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

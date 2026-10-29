@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>X Archive share</title>
+<title>X Archive</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png">
 <meta name="theme-color" content="#8a3b12">
@@ -30,11 +30,49 @@
   .row .what { font-size: 15px; }
   .row .state { font-size: 13px; }
   details summary { cursor: pointer; padding: 6px 0; }
+  .tabs { display: flex; gap: 6px; margin: 0 0 8px; }
+  .tabs button { flex: 1; background: transparent; color: var(--ink); border-color: var(--line); }
+  .tabs button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .link { overflow-wrap: anywhere; font-size: 13px; color: var(--muted); }
+  .res { border-bottom: 1px solid var(--line); padding: 10px 0; }
+  .res:last-child { border-bottom: none; }
+  .rmeta { font-size: 13px; color: var(--muted); }
+  .rid { color: var(--accent); font-family: ui-monospace, Menlo, Consolas, monospace; }
+  .rtext { margin: 4px 0; white-space: pre-wrap; }
+  mark { background: #f6e3a1; color: inherit; border-radius: 2px; }
+  @media (prefers-color-scheme: dark) { mark { background: #6b5a1e; } }
+  select, textarea { font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--ink); }
+  textarea { width: 100%; }
+  #gemChat .turn { white-space: pre-wrap; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  #gemChat .turn.user { color: var(--muted); }
+  #gemChat a { color: var(--accent); font-weight: 600; }
+  .check { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; color: var(--ink); margin: 0; }
+  .check input { width: auto; }
 </style>
 </head>
 <body>
 <main>
-  <h1>X Archive share</h1>
+  <h1>X Archive</h1>
+  <div class="tabs"><button id="tabBtnSearch">Search</button><button id="tabBtnShare">Share</button></div>
+
+  <section id="tabSearch" hidden>
+    <div class="card">
+      <input id="pQ" type="search" placeholder="What are you looking for?" enterkeyhint="search" autocomplete="off">
+      <div class="btns"><button id="pGo">Search</button>
+        <select id="pKind" aria-label="Kind"><option value="all">Posts and articles</option><option value="tweet">Posts</option><option value="article">Articles</option></select></div>
+      <p id="pStatus" class="small muted"></p>
+    </div>
+    <div class="card">
+      <div class="btns" style="margin-top:0"><button id="gemAsk" class="ghost">Ask Gemini about these</button>
+        <label class="check"><input type="checkbox" id="pNotes"> include my notes</label></div>
+      <p id="gemNote" class="small muted"></p>
+      <div id="gemChat" hidden></div>
+      <div id="gemFollowBox" hidden><textarea id="gemFollow" rows="2" placeholder="Carry on: e.g. just the ones from Gurugram"></textarea><div class="btns"><button id="gemSend" class="ghost">Send</button></div></div>
+    </div>
+    <div id="pResults" class="card"><span class="muted small">Results appear here: 25 at a time.</span></div>
+  </section>
+
+  <section id="tabShare">
 
   <div id="shareBox" class="card" hidden>
     <div id="shareState" class="big">Sending…</div>
@@ -51,7 +89,20 @@
   <div id="list" class="card"><span class="muted small">Nothing shared yet.</span></div>
   <div class="btns"><button id="sendAll" class="ghost">Send the waiting ones now</button></div>
 
+  </section>
+
   <h2>Settings</h2>
+  <details class="card">
+    <summary>Search data and Gemini</summary>
+    <p id="dataNote" class="small"></p>
+    <div class="btns"><button id="pUpdate" class="ghost">Update the search data</button></div>
+    <p id="modelNote" class="small"></p>
+    <div class="btns"><button id="modelOn" class="ghost">Turn on meaning search (download)</button></div>
+    <label for="gKey">Gemini key (free, from aistudio.google.com: Get API key)</label><input id="gKey" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="AIza…">
+    <div class="btns"><button id="gKeySave">Save and test</button></div>
+    <p id="gKeyNote" class="small"></p>
+    <p class="small muted">The search data comes from the phone-data branch of your bookmark-archive repository, read with the key below; only files that changed are downloaded. The Gemini key is kept only on this phone. On Gemini's free tier Google may use what is sent, so your notes go only when you tick "include my notes".</p>
+  </details>
   <details id="setBox" class="card">
     <summary>GitHub repository and key</summary>
     <label for="owner">GitHub user</label><input id="owner" autocomplete="off" autocapitalize="off" spellcheck="false">
@@ -63,7 +114,18 @@
   </details>
 </main>
 <script src="send.js"></script>
+<script type="module">
+  import { initSearch } from './phone-search.js';
+  const show = (t) => { document.getElementById('tabSearch').hidden = t !== 'search'; document.getElementById('tabShare').hidden = t !== 'share'; document.getElementById('tabBtnSearch').classList.toggle('on', t === 'search'); document.getElementById('tabBtnShare').classList.toggle('on', t === 'share'); try { localStorage.setItem('xaTab', t); } catch { /* ignore */ } };
+  const arriving = !!window.__xaArriving;
+  let last = 'search'; try { last = localStorage.getItem('xaTab') || 'search'; } catch { /* ignore */ }
+  show(arriving ? 'share' : last);
+  document.getElementById('tabBtnSearch').onclick = () => show('search');
+  document.getElementById('tabBtnShare').onclick = () => show('share');
+  initSearch().catch((e) => { document.getElementById('pStatus').textContent = `Search could not start: ${e.message}`; });
+</script>
 <script>
+window.__xaArriving = /[?&](url|text|title)=/.test(location.search);   // read before the address is cleaned
 (async () => {
   const $ = (s) => document.querySelector(s);
   const esc = (s) => String(s || '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -72,7 +134,7 @@
 
   async function renderList() {
     const all = await XA.allShares();
-    $('#list').innerHTML = all.length ? all.slice(0, 40).map((s) => `<div class="row"><div class="what">${esc(s.title || s.url || s.text.slice(0, 80) || '(empty)')}</div>
+    $('#list').innerHTML = all.length ? all.slice(0, 40).map((s) => `<div class="row"><div class="what">${esc(s.title || s.url || s.text.slice(0, 80) || '(empty)')}</div>${s.url ? `<div class="link">${esc(s.url)}</div>` : ''}
       <div class="state ${s.state === 'sent' ? 'ok' : 'warn'}">${s.state === 'sent' ? `Sent ${new Date(s.sentAt || s.sharedAt).toLocaleString()}` : `Waiting: ${esc(s.note || 'not sent yet')}`}</div></div>`).join('')
       : '<span class="muted small">Nothing shared yet.</span>';
   }
@@ -89,7 +151,7 @@
     history.replaceState(null, '', location.pathname);        // a reload does not send it twice
     await XA.putShare(share);
     $('#shareBox').hidden = false; $('#intro').hidden = true;
-    $('#shareWhat').textContent = share.title || share.url || share.text.slice(0, 120);
+    $('#shareWhat').innerHTML = `${esc(share.title || share.text.slice(0, 120) || '')}${share.url ? `<div class="link">Link sent: ${esc(share.url)}</div>` : ''}${/share\.google/i.test(share.url) ? '<div class="link">A Discover link: the computer finds the real address when it saves the page.</div>' : ''}`;
     const show = async () => {
       const r = await XA.sendWaiting();
       const mine = (await XA.allShares()).find((x) => x.id === share.id);
