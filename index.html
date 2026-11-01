@@ -48,12 +48,15 @@
   #gemChat a { color: var(--accent); font-weight: 600; }
   .check { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; color: var(--ink); margin: 0; }
   .check input { width: auto; }
+  .bar { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; margin: 6px 0; }
+  .bar > i { display: block; height: 100%; background: var(--accent); }
+  .total { font: 700 30px/1.1 "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif; color: var(--accent); }
 </style>
 </head>
 <body>
 <main>
   <h1>X Archive</h1>
-  <div class="tabs"><button id="tabBtnSearch">Search</button><button id="tabBtnShare">Share</button></div>
+  <div class="tabs"><button id="tabBtnSearch">Search</button><button id="tabBtnProgress">Progress</button><button id="tabBtnShare">Share</button></div>
 
   <section id="tabSearch" hidden>
     <div class="card">
@@ -70,6 +73,11 @@
       <div id="gemFollowBox" hidden><textarea id="gemFollow" rows="2" placeholder="Carry on: e.g. just the ones from Gurugram"></textarea><div class="btns"><button id="gemSend" class="ghost">Send</button></div></div>
     </div>
     <div id="pResults" class="card"><span class="muted small">Results appear here: 25 at a time.</span></div>
+  </section>
+
+  <section id="tabProgress" hidden>
+    <div class="btns" style="margin-top:0"><button id="prRefresh" class="ghost">Refresh</button><span id="prNote" class="small muted"></span></div>
+    <div id="prBox"><span class="muted small">Nothing yet.</span></div>
   </section>
 
   <section id="tabShare">
@@ -116,12 +124,17 @@
 <script src="send.js"></script>
 <script type="module">
   import { initSearch } from './phone-search.js';
-  const show = (t) => { document.getElementById('tabSearch').hidden = t !== 'search'; document.getElementById('tabShare').hidden = t !== 'share'; document.getElementById('tabBtnSearch').classList.toggle('on', t === 'search'); document.getElementById('tabBtnShare').classList.toggle('on', t === 'share'); try { localStorage.setItem('xaTab', t); } catch { /* ignore */ } };
+  import { initProgress, refreshProgress } from './phone-progress.js';
+  const TABS = ['search', 'progress', 'share'];
+  const id = (t) => 'tab' + t[0].toUpperCase() + t.slice(1);
+  let cur = 'search';
+  const show = (t) => { cur = t; for (const x of TABS) { document.getElementById(id(x)).hidden = x !== t; document.getElementById('tabBtn' + x[0].toUpperCase() + x.slice(1)).classList.toggle('on', x === t); } try { localStorage.setItem('xaTab', t); } catch { /* ignore */ } if (t === 'progress') refreshProgress(); };
   const arriving = !!window.__xaArriving;
   let last = 'search'; try { last = localStorage.getItem('xaTab') || 'search'; } catch { /* ignore */ }
+  if (!TABS.includes(last)) last = 'search';
+  initProgress(() => cur === 'progress');
   show(arriving ? 'share' : last);
-  document.getElementById('tabBtnSearch').onclick = () => show('search');
-  document.getElementById('tabBtnShare').onclick = () => show('share');
+  for (const x of TABS) document.getElementById('tabBtn' + x[0].toUpperCase() + x.slice(1)).onclick = () => show(x);
   initSearch().catch((e) => { document.getElementById('pStatus').textContent = `Search could not start: ${e.message}`; });
 </script>
 <script>
